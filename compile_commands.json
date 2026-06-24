@@ -1,0 +1,36 @@
+[
+  {
+    "file": "src/ec-assert.c",
+    "arguments": [
+      "/usr/sbin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-O2",
+      "-MMD",
+      "-Iinclude",
+      "-c",
+      "src/ec-assert.c",
+      "-o",
+      "obj/ec-assert.o"
+    ],
+    "directory": "/home/vinne/scripts/ecassert-lib",
+    "output": "obj/ec-assert.o"
+  },
+  {
+    "file": "src/main.c",
+    "arguments": [
+      "/usr/sbin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-O2",
+      "-MMD",
+      "-Iinclude",
+      "-c",
+      "src/main.c",
+      "-o",
+      "obj/main.o"
+    ],
+    "directory": "/home/vinne/scripts/ecassert-lib",
+    "output": "obj/main.o"
+  }
+]

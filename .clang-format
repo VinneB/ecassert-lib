@@ -1,0 +1,9 @@
+# Disable line breaking based on character count length
+ColumnLimit: 0
+
+# Keep arguments/parameters grouped together on one line
+BinPackArguments: true
+BinPackParameters: true
+
+# Control alignment without enforcing multi-line breaks
+AlignAfterOpenBracket: Align
