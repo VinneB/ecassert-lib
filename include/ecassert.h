@@ -40,8 +40,8 @@ unsigned int eca_assert_primitive(void *expected, void *actual, size_t element_s
 
 unsigned int eca_assert_array(void *actual, unsigned int actual_size, void *expected, unsigned int expected_size, size_t element_size, char print_msg);
 
-#define ECA_EQUAL_RET_POINTER(expected_p, actual_p, element_size)                                \
-  if (ec_assert_primitive(expected_p, actual_p, element_size, 1)) {                                                     \
+#define ECA_ASSERT_POINTER(expected_p, actual_p, element_size)                                \
+  if (eca_assert_primitive(expected_p, actual_p, element_size, 1)) {                                                     \
     return ECA_FAIL;                                                                    \
   };
 
