@@ -47,11 +47,18 @@ struct suite {
   unsigned char is_init;
 } suite = {NULL, 0, 0, 0, 0, 0};
 
+struct trace {
+  char *data;
+  unsigned int size;
+  unsigned int capacity;
+};
+
 struct eca_test {
   char const *module_name;
   char const *test_name;
   eca_test_func test;
   eca_status status;
+  struct trace trace;
   unsigned char has_test_ran;
 };
 
@@ -77,8 +84,11 @@ element to_element(void *raw_element, size_t element_size) {
   return packed_element;
 }
 
-inline void print_element(void *element, size_t element_size) {
-  printf("0x%0*x", (int)(element_size * 2), to_element(element, element_size));
+inline void print_element(struct trace *trace, void *element, size_t element_size) {
+
+  unsigned int str_len = (element_size * 2) + 3;
+  snprintf(trace->data + trace->size, str_len, "0x%0*x", (int)(element_size * 2), to_element(element, element_size));
+  trace->size += str_len - 1;
 }
 
 void print_arr(void *arr, unsigned int arr_size, size_t element_size) {
