@@ -24,8 +24,15 @@ const unsigned int MISMATCH_COLUMN_COUNT = 3;
 
 const unsigned int INITIAL_TESTS_SIZE = 64;
 const unsigned int INITIAL_MODULES_SIZE = 64;
+const unsigned int INTIIAL_TRACE_DATA_SIZE = 256;
 
-struct eca_test *eca_current_test = NULL;
+const unsigned int MAX_NUM_CHAR_PRINT_TO_TRACE = 64;
+
+void eca_tostring_element_hex(void *element, size_t element_size, char *output_str);
+eca_to_string registered_to_string = eca_tostring_element_hex;
+eca_to_string prev_registered_to_string = eca_tostring_element_hex;
+
+struct eca_test *current_test = NULL;
 
 typedef unsigned char byte;
 typedef uint32_t element;
@@ -62,8 +69,18 @@ struct eca_test {
   unsigned char has_test_ran;
 };
 
-unsigned int realloc_pointer(void **p, unsigned int capacity, size_t element_size) {
+void eca_register_to_string(eca_to_string to_string_func) {
+  prev_registered_to_string = registered_to_string;
+  registered_to_string = to_string_func;
+}
+
+void eca_restore_prev_to_string() {
+  registered_to_string = prev_registered_to_string;
+}
+
+unsigned int realloc_pointer(void **p, unsigned int capacity, size_t element_size, unsigned int inc_amount) {
   unsigned int new_capacity = capacity + (capacity >> 1);
+  new_capacity = (new_capacity < capacity + inc_amount) ? capacity + inc_amount : new_capacity;
   void *tmp = realloc(*p, new_capacity * element_size);
   if (tmp == NULL) {
     fprintf(stderr, "malloc failed. Could reallocate pointer. Terminating...\n");
@@ -85,22 +102,37 @@ element to_element(void *raw_element, size_t element_size) {
 }
 
 inline void print_element(struct trace *trace, void *element, size_t element_size) {
-
-  unsigned int str_len = (element_size * 2) + 3;
-  snprintf(trace->data + trace->size, str_len, "0x%0*x", (int)(element_size * 2), to_element(element, element_size));
-  trace->size += str_len - 1;
+  if (trace->size + MAX_NUM_CHAR_PRINT_TO_TRACE > trace->capacity) {
+    trace->capacity = realloc_pointer((void **)&trace->data, trace->capacity, sizeof(char), MAX_NUM_CHAR_PRINT_TO_TRACE);
+  }
+  char element_str[MAX_NUM_CHAR_PRINT_TO_TRACE];
+  registered_to_string(element, element_size, element_str);
+  trace->size += snprintf(trace->data + trace->size, trace->capacity - trace->size, "%s", element_str);
 }
 
-void print_arr(void *arr, unsigned int arr_size, size_t element_size) {
+void print_string_to_trace_int_args(struct trace *trace, char *string, int arg1, int arg2, int arg3) {
+  if (trace->size + MAX_NUM_CHAR_PRINT_TO_TRACE > trace->capacity) {
+    trace->capacity = realloc_pointer((void **)&trace->data, trace->capacity, sizeof(char), MAX_NUM_CHAR_PRINT_TO_TRACE);
+  }
+  trace->size += snprintf(trace->data + trace->size, trace->capacity - trace->size, string, arg1, arg2, arg3);
+}
+void print_string_to_trace(struct trace *trace, char *string) {
+  if (trace->size + MAX_NUM_CHAR_PRINT_TO_TRACE > trace->capacity) {
+    trace->capacity = realloc_pointer((void **)&trace->data, trace->capacity, sizeof(char), MAX_NUM_CHAR_PRINT_TO_TRACE);
+  }
+  trace->size += snprintf(trace->data + trace->size, trace->capacity - trace->size, "%s", string);
+}
+
+void print_arr(struct trace *trace, void *arr, unsigned int arr_size, size_t element_size) {
   byte *p;
-  printf("[");
+  print_string_to_trace(trace, "[");
   for (p = (byte *)arr; p < (byte *)arr + ((arr_size - 1) * element_size);
        p = p + element_size) {
-    print_element(p, element_size);
-    printf(", ");
+    print_element(trace, p, element_size);
+    print_string_to_trace(trace, ", ");
   }
-  print_element(p, element_size);
-  printf("]");
+  print_element(trace, p, element_size);
+  print_string_to_trace(trace, "]");
 }
 
 void eca_setup() {
@@ -122,6 +154,7 @@ void eca_setup() {
     eca_cleanup();
     exit(1);
   }
+  registered_to_string = eca_tostring_element_hex;
 }
 
 void eca_cleanup() {
@@ -132,6 +165,9 @@ void eca_cleanup() {
   printf("%d\n", suite.modules_capacity);
   for (struct module *p = suite.modules; p < suite.modules + suite.modules_size; p = p + 1) {
     printf("debug: freeing test\n");
+    for (struct eca_test *q = p->tests; q < p->tests + p->test_size; q = q + 1) {
+      free(q->trace.data);
+    }
     free(p->tests);
   }
   printf("free 2\n");
@@ -147,6 +183,7 @@ void eca_cleanup() {
 void eca_register_test(const char *module_name, const char *test_name, eca_test_func test) {
   if (!suite.is_init) {
     fprintf(stderr, "Attemping to register test with non-initialized test suite. Run eca_setup() first. Terminating...");
+    eca_cleanup();
     exit(1);
   }
   // Find module
@@ -162,16 +199,18 @@ void eca_register_test(const char *module_name, const char *test_name, eca_test_
   }
   if (!found_module && suite.modules_size == suite.modules_capacity) {
     printf("debug: reallocing modules\n");
-    suite.modules_capacity = realloc_pointer((void **)&suite.modules, suite.modules_capacity, sizeof(struct module));
+    suite.modules_capacity = realloc_pointer((void **)&suite.modules, suite.modules_capacity, sizeof(struct module), 1);
   }
   if (!found_module) {
     printf("debug: initing module\n");
     module = suite.modules + suite.modules_size;
     module->tests = malloc(sizeof(struct eca_test) * INITIAL_TESTS_SIZE);
     if (module->tests == NULL) {
+      eca_cleanup();
       fprintf(stderr, "malloc failed. Could not register test. Terminating...\n");
       exit(1);
     }
+    memset(module->tests, 0, sizeof(struct eca_test) * INITIAL_TESTS_SIZE);
     module->module_name = module_name;
     module->test_size = 0;
     module->test_capacity = INITIAL_TESTS_SIZE;
@@ -180,9 +219,17 @@ void eca_register_test(const char *module_name, const char *test_name, eca_test_
     printf("finished initing module\n");
   }
   // Add test
-  struct eca_test new_test = {module_name, test_name, test, ECA_FAIL, 0};
+  struct trace trace = {NULL, 0, 0};
+  trace.data = malloc(sizeof(char) * MAX_NUM_CHAR_PRINT_TO_TRACE);
+  if (trace.data == NULL) {
+    eca_cleanup();
+    fprintf(stderr, "malloc failed. Could not register test. Terminating...\n");
+    exit(1);
+  }
+  memset(trace.data, 0, sizeof(char) * MAX_NUM_CHAR_PRINT_TO_TRACE);
+  struct eca_test new_test = {module_name, test_name, test, ECA_FAIL, trace, 0};
   if (module->test_size == module->test_capacity) {
-    module->test_capacity = realloc_pointer((void **)&module->tests, module->test_capacity, sizeof(struct eca_test));
+    module->test_capacity = realloc_pointer((void **)&module->tests, module->test_capacity, sizeof(struct eca_test), 1);
   }
   *(module->tests + module->test_size) = new_test;
   module->test_size++;
@@ -193,6 +240,7 @@ void eca_run_tests() {
   printf("Running %d tests...\n", suite.test_count);
   for (struct module *p = suite.modules; p < suite.modules + suite.modules_size; p = p + 1) {
     for (struct eca_test *q = p->tests; q < p->tests + p->test_size; q = q + 1) {
+      current_test = q;
       q->status = q->test();
       q->has_test_ran = 1;
       if (q->status == ECA_FAIL) {
@@ -201,12 +249,14 @@ void eca_run_tests() {
       }
     }
   }
+  current_test = NULL;
   printf("TEST RESULTS\n");
   for (struct module *p = suite.modules; p < suite.modules + suite.modules_size; p = p + 1) {
-    printf("Module %s - %s - %d / %d passed\n", p->module_name, (p->fail_count > 0) ? "FAILED" : "PASSED", p->test_size - p->fail_count, p->test_size);
+    printf("--- MODULE %s - %s - %d / %d TESTS PASSED ---\n", p->module_name, (p->fail_count > 0) ? "FAILED" : "PASSED", p->test_size - p->fail_count, p->test_size);
     for (struct eca_test *q = p->tests; q < p->tests + p->test_size; q = q + 1) {
       if (q->status == ECA_FAIL) {
-        printf("%s failed\n", q->test_name);
+        printf("TEST \"%s\" FAILED\n", q->test_name);
+        printf("%s\n", q->trace.data);
       }
     }
   }
@@ -221,29 +271,27 @@ unsigned int eca_assert_primitive(void *expected, void *actual, size_t element_s
       continue;
     }
     if (print_msg) {
-      printf("ASSERT FAILED\n");
+      print_string_to_trace(&(current_test->trace), "ASSERT FAILED\n");
     }
-    if (element_size <= sizeof(element)) {
-      printf("\texpected = ");
-      print_element(expected, element_size);
-      printf("\n\tactual = ");
-      print_element(actual, element_size);
-      printf("\n");
+    if (element_size <= sizeof(element) || registered_to_string != eca_tostring_element_hex) {
+      print_string_to_trace(&(current_test->trace), "\texpected = ");
+      print_element(&(current_test->trace), expected, element_size);
+      print_string_to_trace(&(current_test->trace), "\n\tactual = ");
+      print_element(&(current_test->trace), actual, element_size);
+      print_string_to_trace(&(current_test->trace), "\n");
     }
     return ECA_FAIL;
   }
   return ECA_PASS;
 }
 
-unsigned int eca_assert_array(void *actual, unsigned int actual_size, void *expected, unsigned int expected_size, size_t element_size, char print_msg) {
+unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *actual, unsigned int actual_size, size_t element_size, char print_msg) {
   eca_status return_val = ECA_PASS;
   unsigned int smallest_size =
       (actual_size < expected_size) ? actual_size : expected_size;
   if (actual_size != expected_size) {
     if (print_msg) {
-      printf("ASSERT FAILED\n\texpected size = %d\n\tactual size = "
-             "%d\nTruncating both arrays to smaller size (%d)\n",
-             actual_size, expected_size, smallest_size);
+      print_string_to_trace_int_args(&(current_test->trace), "ASSERT FAILED\n\texpected size = %d\n\tactual size = %d\nTruncating both arrays to smaller size (%d)\n", expected_size, actual_size, smallest_size);
     }
     return_val = ECA_FAIL;
   }
@@ -268,27 +316,49 @@ unsigned int eca_assert_array(void *actual, unsigned int actual_size, void *expe
   }
 
   if (mismatch_arr_index > 0 && print_msg) {
-    printf("ASSERT FAILED\n\tvalue mismatch\n");
-    if (actual_size <= MAX_PRINT_ARRAY_SIZE && expected_size <= MAX_PRINT_ARRAY_SIZE && element_size <= sizeof(element)) {
-      printf("\texpected = ");
-      print_arr(actual, smallest_size, element_size);
-      printf("\n\tactual = ");
-      print_arr(expected, smallest_size, element_size);
-      printf("\n");
+    print_string_to_trace(&(current_test->trace), "ASSERT FAILED\n\tvalue mismatch\n");
+    if (actual_size <= MAX_PRINT_ARRAY_SIZE && expected_size <= MAX_PRINT_ARRAY_SIZE && (element_size <= sizeof(element) || registered_to_string != eca_tostring_element_hex)) {
+      print_string_to_trace(&(current_test->trace), "\texpected = ");
+      print_arr(&(current_test->trace), expected, smallest_size, element_size);
+      print_string_to_trace(&(current_test->trace), "\n\tactual = ");
+      print_arr(&(current_test->trace), actual, smallest_size, element_size);
+      print_string_to_trace(&(current_test->trace), "\n");
     } else if (element_size <= sizeof(element)) {
       for (unsigned int i = 0; i < mismatch_arr_index; i++) {
-        printf("\t| idx %3d: expected = ", mismatch_arr[i]);
-        print_element(a + (mismatch_arr[i] * element_size), element_size);
-        printf(" ; actual = ");
-        print_element(b + (mismatch_arr[i] * element_size), element_size);
+        print_string_to_trace_int_args(&(current_test->trace), "\t| idx %3d: expected = ", mismatch_arr[i], 0, 0);
+        print_element(&(current_test->trace), a + (mismatch_arr[i] * element_size), element_size);
+        print_string_to_trace(&(current_test->trace), " ; actual = ");
+        print_element(&(current_test->trace), b + (mismatch_arr[i] * element_size), element_size);
         if (((i % MISMATCH_COLUMN_COUNT) == MISMATCH_COLUMN_COUNT - 1) || i == mismatch_arr_index - 1) {
-          printf(" |\n");
+          print_string_to_trace(&(current_test->trace), " |\n");
         }
       }
       if (surpassed_mismatch_arr_index) {
-        printf("\t... (more not shown\n");
+        print_string_to_trace(&(current_test->trace), "\t... (more not shown\n");
       }
     }
   }
   return return_val;
+}
+
+// To string functions
+
+inline void eca_tostring_int(void *element, size_t element_size, char *str) {
+  snprintf(str, MAX_NUM_CHAR_PRINT_TO_TRACE, "%d", *((int *)element));
+}
+
+void eca_tostring_short(void *element, size_t element_size, char *str) {
+  snprintf(str, MAX_NUM_CHAR_PRINT_TO_TRACE, "%hd", *((short *)element));
+}
+void eca_tostring_char(void *element, size_t element_size, char *str) {
+  snprintf(str, MAX_NUM_CHAR_PRINT_TO_TRACE, "%c", *((char *)element));
+}
+void eca_tostring_long(void *element, size_t element_size, char *str) {
+  snprintf(str, MAX_NUM_CHAR_PRINT_TO_TRACE, "%ld", *((long *)element));
+}
+void eca_tostring_longlong(void *element, size_t element_size, char *str) {
+  snprintf(str, MAX_NUM_CHAR_PRINT_TO_TRACE, "%lld", *((long long *)element));
+}
+void eca_tostring_element_hex(void *element, size_t element_size, char *output_str) {
+  snprintf(output_str, MAX_NUM_CHAR_PRINT_TO_TRACE, "0x%0*x", (int)(element_size * 2), to_element(element, element_size));
 }
