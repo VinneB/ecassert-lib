@@ -154,7 +154,6 @@ void eca_setup() {
   suite.is_init = 1;
   suite.modules = malloc(sizeof(struct module) * INITIAL_MODULES_SIZE);
   memset(suite.modules, 0, sizeof(struct module) * INITIAL_MODULES_SIZE);
-  printf("debug: malloced modules\n");
   if (suite.modules == NULL) {
     fprintf(stderr, "malloc failed. Could not init test suite. Terminating...\n");
     eca_cleanup();
@@ -168,15 +167,12 @@ void eca_cleanup() {
     return;
   }
   printf("Cleaning up...\n");
-  printf("%d\n", suite.modules_capacity);
   for (struct module *p = suite.modules; p < suite.modules + suite.modules_size; p = p + 1) {
-    printf("debug: freeing test\n");
     for (struct eca_test *q = p->tests; q < p->tests + p->test_size; q = q + 1) {
       free(q->trace.data);
     }
     free(p->tests);
   }
-  printf("free 2\n");
   free(suite.modules);
   suite.modules = NULL;
   suite.modules_capacity = 0;
@@ -199,16 +195,13 @@ void eca_register_test(const char *module_name, const char *test_name, eca_test_
     if (suite.modules[i].module_name == module_name) {
       found_module = 1;
       module = suite.modules + i;
-      printf("debug: found module\n");
       break;
     }
   }
   if (!found_module && suite.modules_size == suite.modules_capacity) {
-    printf("debug: reallocing modules\n");
     suite.modules_capacity = realloc_pointer((void **)&suite.modules, suite.modules_capacity, sizeof(struct module), 1);
   }
   if (!found_module) {
-    printf("debug: initing module\n");
     module = suite.modules + suite.modules_size;
     module->tests = malloc(sizeof(struct eca_test) * INITIAL_TESTS_SIZE);
     if (module->tests == NULL) {
@@ -222,7 +215,6 @@ void eca_register_test(const char *module_name, const char *test_name, eca_test_
     module->test_capacity = INITIAL_TESTS_SIZE;
     module->fail_count = 0;
     suite.modules_size++;
-    printf("finished initing module\n");
   }
   // Add test
   struct trace trace = {NULL, 0, 0};
