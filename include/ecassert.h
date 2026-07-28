@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 
 extern struct eca_test *eca_current_test;
 
@@ -28,6 +29,10 @@ extern unsigned long eca_m_ulong_2;
 extern unsigned long long eca_m_ulonglong_1;
 extern unsigned long long eca_m_ulonglong_2;
 
+#define PRINT_BUF_SIZE 256
+
+extern char print_buf[PRINT_BUF_SIZE];
+
 // built-in to_string functions
 
 void eca_tostring_int(void *, size_t, char *);
@@ -45,6 +50,7 @@ void eca_cleanup();
 void eca_run_tests();
 void eca_register_to_string(eca_to_string to_string_func);
 void eca_restore_prev_to_string();
+void eca_print(char *string);
 
 // Assert functions
 
@@ -54,6 +60,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 
 #define ECA_ASSERT(expected, actual, element_size)                                \
   if (eca_assert_primitive(expected, actual, element_size, 1)) {                                                     \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     return ECA_FAIL;                                                                    \
   };
 
@@ -63,6 +71,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
   eca_m_uint_2 = (unsigned int) actual; \
   eca_register_to_string(eca_tostring_int); \
   if (eca_assert_primitive((void *)&eca_m_uint_1, (void *)&eca_m_uint_2, sizeof(eca_m_uint_1), 1)) {             \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL;             \
   }; \
@@ -74,6 +84,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
   eca_m_ushort_2 = (unsigned short) actual; \
   eca_register_to_string(eca_tostring_short); \
   if (eca_assert_primitive((void *)&eca_m_ushort_1, (void *)&eca_m_ushort_2, sizeof(eca_m_ushort_1), 1)) {             \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL;             \
   }; \
@@ -85,6 +97,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
   eca_m_uchar_2 = (unsigned char) actual; \
   eca_register_to_string(eca_tostring_char); \
   if (eca_assert_primitive((void *)&eca_m_uchar_1, (void *)&eca_m_uchar_2, sizeof(eca_m_uchar_1), 1)) {             \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL;             \
   }; \
@@ -96,6 +110,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
   eca_m_ulong_2 = (unsigned long) actual; \
   eca_register_to_string(eca_tostring_long); \
   if (eca_assert_primitive((void *)&eca_m_ulong_1, (void *)&eca_m_ulong_2, sizeof(eca_m_ulong_1), 1)) {             \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL;             \
   }; \
@@ -107,6 +123,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
   eca_m_ulonglong_2 = (unsigned long) actual; \
   eca_register_to_string(eca_tostring_long); \
   if (eca_assert_primitive((void *)&eca_m_ulonglong_1, (void *)&eca_m_ulonglong_2, sizeof(eca_m_ulonglong_1), 1)) {             \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL;             \
   }; \
@@ -114,6 +132,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 
 #define ECA_ASSERT_ARR(expected, expected_size, actual, actual_size, element_size) \
   if (eca_assert_array(expected, expected_size, actual, actual_size, element_size, 1)) { \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     return ECA_FAIL; \
   } \
 
@@ -121,6 +141,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 #define ECA_ASSERT_ARR_INT(expected, expected_size, actual, actual_size) \
   eca_register_to_string(eca_tostring_int); \
   if (eca_assert_array(expected, expected_size, actual, actual_size, sizeof(unsigned int), 1)) { \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL; \
   } \
@@ -129,6 +151,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 #define ECA_ASSERT_ARR_SHORT(expected, expected_size, actual, actual_size) \
   eca_register_to_string(eca_tostring_short); \
   if (eca_assert_array(expected, expected_size, actual, actual_size, sizeof(unsigned short), 1)) { \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL; \
   } \
@@ -137,6 +161,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 #define ECA_ASSERT_ARR_CHAR(expected, expected_size, actual, actual_size) \
   eca_register_to_string(eca_tostring_char); \
   if (eca_assert_array(expected, expected_size, actual, actual_size, sizeof(unsigned char), 1)) { \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL; \
   } \
@@ -145,6 +171,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 #define ECA_ASSERT_ARR_LONG(expected, expected_size, actual, actual_size) \
   eca_register_to_string(eca_tostring_long); \
   if (eca_assert_array(expected, expected_size, actual, actual_size, sizeof(unsigned long), 1)) { \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL; \
   } \
@@ -153,6 +181,8 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
 #define ECA_ASSERT_ARR_LONGLONG(expected, expected_size, actual, actual_size) \
   eca_register_to_string(eca_tostring_longlong); \
   if (eca_assert_array(expected, expected_size, actual, actual_size, sizeof(unsigned long long), 1)) { \
+    snprintf(print_buf, PRINT_BUF_SIZE, "\tat %s:%d\n", __FILE__, __LINE__); \
+    eca_print(print_buf); \
     eca_restore_prev_to_string(); \
     return ECA_FAIL; \
   } \

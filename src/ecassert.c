@@ -18,6 +18,8 @@ unsigned long eca_m_ulong_2 = 0;
 unsigned long long eca_m_ulonglong_1 = 0;
 unsigned long long eca_m_ulonglong_2 = 0;
 
+char print_buf[256] = {};
+
 const unsigned int MAX_PRINT_ARRAY_SIZE = 10;
 const unsigned int MAX_MISMATCH_INDEX_ARR_SIZE = 10;
 const unsigned int MISMATCH_COLUMN_COUNT = 3;
@@ -121,6 +123,10 @@ void print_string_to_trace(struct trace *trace, char *string) {
     trace->capacity = realloc_pointer((void **)&trace->data, trace->capacity, sizeof(char), MAX_NUM_CHAR_PRINT_TO_TRACE);
   }
   trace->size += snprintf(trace->data + trace->size, trace->capacity - trace->size, "%s", string);
+}
+
+void eca_print(char *string) {
+  print_string_to_trace(&(current_test->trace), string);
 }
 
 void print_arr(struct trace *trace, void *arr, unsigned int arr_size, size_t element_size) {
@@ -252,7 +258,7 @@ void eca_run_tests() {
   current_test = NULL;
   printf("TEST RESULTS\n");
   for (struct module *p = suite.modules; p < suite.modules + suite.modules_size; p = p + 1) {
-    printf("--- MODULE %s - %s - %d / %d TESTS PASSED ---\n", p->module_name, (p->fail_count > 0) ? "FAILED" : "PASSED", p->test_size - p->fail_count, p->test_size);
+    printf("--- MODULE %s - %s - %d / %d TESTS PASSED ---\n\n", p->module_name, (p->fail_count > 0) ? "FAILED" : "PASSED", p->test_size - p->fail_count, p->test_size);
     for (struct eca_test *q = p->tests; q < p->tests + p->test_size; q = q + 1) {
       if (q->status == ECA_FAIL) {
         printf("TEST \"%s\" FAILED\n", q->test_name);
@@ -271,12 +277,12 @@ unsigned int eca_assert_primitive(void *expected, void *actual, size_t element_s
       continue;
     }
     if (print_msg) {
-      print_string_to_trace(&(current_test->trace), "ASSERT FAILED\n");
+      print_string_to_trace(&(current_test->trace), "\tASSERT FAILED\n");
     }
     if (element_size <= sizeof(element) || registered_to_string != eca_tostring_element_hex) {
-      print_string_to_trace(&(current_test->trace), "\texpected = ");
+      print_string_to_trace(&(current_test->trace), "\t\texpected = ");
       print_element(&(current_test->trace), expected, element_size);
-      print_string_to_trace(&(current_test->trace), "\n\tactual = ");
+      print_string_to_trace(&(current_test->trace), "\n\t\tactual = ");
       print_element(&(current_test->trace), actual, element_size);
       print_string_to_trace(&(current_test->trace), "\n");
     }
@@ -291,7 +297,7 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
       (actual_size < expected_size) ? actual_size : expected_size;
   if (actual_size != expected_size) {
     if (print_msg) {
-      print_string_to_trace_int_args(&(current_test->trace), "ASSERT FAILED\n\texpected size = %d\n\tactual size = %d\nTruncating both arrays to smaller size (%d)\n", expected_size, actual_size, smallest_size);
+      print_string_to_trace_int_args(&(current_test->trace), "\tASSERT FAILED\n\t\texpected size = %d\n\t\tactual size = %d\n\t\tTruncating both arrays to smaller size (%d)\n", expected_size, actual_size, smallest_size);
     }
     return_val = ECA_FAIL;
   }
@@ -316,21 +322,22 @@ unsigned int eca_assert_array(void *expected, unsigned int expected_size, void *
   }
 
   if (mismatch_arr_index > 0 && print_msg) {
-    print_string_to_trace(&(current_test->trace), "ASSERT FAILED\n\tvalue mismatch\n");
+    print_string_to_trace(&(current_test->trace), "\tASSERT FAILED\n\t\tvalue mismatch\n");
     if (actual_size <= MAX_PRINT_ARRAY_SIZE && expected_size <= MAX_PRINT_ARRAY_SIZE && (element_size <= sizeof(element) || registered_to_string != eca_tostring_element_hex)) {
-      print_string_to_trace(&(current_test->trace), "\texpected = ");
+      print_string_to_trace(&(current_test->trace), "\t\texpected = ");
       print_arr(&(current_test->trace), expected, smallest_size, element_size);
-      print_string_to_trace(&(current_test->trace), "\n\tactual = ");
+      print_string_to_trace(&(current_test->trace), "\n\t\tactual = ");
       print_arr(&(current_test->trace), actual, smallest_size, element_size);
       print_string_to_trace(&(current_test->trace), "\n");
     } else if (element_size <= sizeof(element)) {
+      print_string_to_trace(&(current_test->trace), "\t");
       for (unsigned int i = 0; i < mismatch_arr_index; i++) {
         print_string_to_trace_int_args(&(current_test->trace), "\t| idx %3d: expected = ", mismatch_arr[i], 0, 0);
         print_element(&(current_test->trace), a + (mismatch_arr[i] * element_size), element_size);
         print_string_to_trace(&(current_test->trace), " ; actual = ");
         print_element(&(current_test->trace), b + (mismatch_arr[i] * element_size), element_size);
         if (((i % MISMATCH_COLUMN_COUNT) == MISMATCH_COLUMN_COUNT - 1) || i == mismatch_arr_index - 1) {
-          print_string_to_trace(&(current_test->trace), " |\n");
+          print_string_to_trace(&(current_test->trace), " |\n\t");
         }
       }
       if (surpassed_mismatch_arr_index) {
